@@ -119,6 +119,23 @@ The server can be configured using environment variables in `docker-compose.yml`
 - **Default**: `10`
 - **Usage**: Only used if `SERVER_BACKUP_DIR` is set. Defines how often backups are created
 
+#### `SERVER_AUTH_ENABLED`
+- **Description**: Enable Device Code Flow (RFC 8628) authentication for the Hytale server
+- **Default**: `true`
+- **Usage**: 
+  - **If set to `true`**: The entrypoint script will automatically perform Device Code Flow authentication on first run if tokens don't exist
+  - **If set to `false` or empty**: Authentication is skipped and the server starts without authentication tokens
+  - **On first run with `SERVER_AUTH_ENABLED=true`**: 
+    - The script will request a device code from Hytale's OAuth2 endpoint
+    - Display instructions with a URL and user code for authorization
+    - Wait for user authorization (up to 15 minutes)
+    - Save authentication tokens to `/hytale/tokens.json` file (contains all tokens including access_token, id_token, and refresh_token)
+  - **On subsequent runs**: 
+    - If tokens exist, they are automatically used
+    - If refresh token exists, tokens are automatically refreshed before use
+  - **Token persistence**: Tokens are saved in `/hytale`, so mounting this directory as a volume ensures tokens persist across container restarts
+  - **Note**: This authentication is required for certain Hytale server features. If authentication fails, the server may still start but with limited functionality
+
 #### `SERVER_MIN_RAM`
 - **Description**: Minimum RAM allocation for the Java process
 - **Default**: Empty (uses JVM default)
@@ -146,6 +163,41 @@ The server can be configured using environment variables in `docker-compose.yml`
 - **Note**: 
   - These arguments are passed after memory settings (`SERVER_MIN_RAM`/`SERVER_MAX_RAM`) and before the `-jar` flag
   - For memory configuration, prefer using `SERVER_MIN_RAM` and `SERVER_MAX_RAM` for simplicity
+
+#### `SERVER_NAME`
+- **Description**: Server name displayed to players
+- **Default**: `Hytale Server` (from config.json)
+- **Format**: String
+- **Examples**: `My Awesome Server`, `Hytale PvP Arena`
+- **Usage**: Sets the `ServerName` field in `config.json`. This name is shown in server lists and when players connect
+
+#### `SERVER_MOTD`
+- **Description**: Message of the Day displayed to players
+- **Default**: Empty (from config.json)
+- **Format**: String
+- **Examples**: `Welcome to our server!`, `Have fun and be respectful!`
+- **Usage**: Sets the `MOTD` field in `config.json`. This message is displayed to players when they connect
+
+#### `SERVER_PASSWORD`
+- **Description**: Server password for protected access
+- **Default**: Empty (no password, from config.json)
+- **Format**: String
+- **Examples**: `MySecurePassword123`, ``
+- **Usage**: Sets the `Password` field in `config.json`. If set, players must enter this password to join the server. Leave empty for no password
+
+#### `SERVER_MAX_PLAYERS`
+- **Description**: Maximum number of players allowed on the server
+- **Default**: `100` (from config.json)
+- **Format**: Integer
+- **Examples**: `50`, `200`, `10`
+- **Usage**: Sets the `MaxPlayers` field in `config.json`. Defines the maximum concurrent player limit
+
+#### `SERVER_MAX_VIEW_RADIUS`
+- **Description**: Maximum view radius for players
+- **Default**: `32` (from config.json)
+- **Format**: Integer
+- **Examples**: `16`, `64`, `48`
+- **Usage**: Sets the `MaxViewRadius` field in `config.json`. Controls how far players can see in the game world
 
 ### Downloader Configuration
 

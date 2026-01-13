@@ -21,8 +21,13 @@ RUN cd /hytale
 # Set the downloader URL
 ENV DOWNLOADER_URL=https://downloader.hytale.com/hytale-downloader.zip
 
-# Install unzip and wget
-RUN apt-get update && apt-get install -y unzip wget
+# Install unzip, wget, curl, and jq (for JSON manipulation)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    unzip \
+    wget \
+    curl \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
 
 # Download the downloader
 RUN wget -q -O hytale-downloader.zip $DOWNLOADER_URL

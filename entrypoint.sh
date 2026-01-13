@@ -8,6 +8,12 @@ set -e
 # because we don't know how to handle them
 DOWNLOADER_SKIP_UPDATE_CHECK="true"
 
+# Defaults
+SERVER_AUTH_ENABLED="${SERVER_AUTH_ENABLED:-true}"
+SERVER_ASSETS_ZIP="${SERVER_ASSETS_ZIP:-}"
+SERVER_BACKUP_DIR="${SERVER_BACKUP_DIR:-/hytale/backups}"
+SERVER_BACKUP_INTERVAL="${SERVER_BACKUP_INTERVAL:-10}"
+
 # Set the app directory
 APP_DIR="${APP_DIR:-/hytale}"
 
@@ -105,6 +111,270 @@ fi
 
 echo "initializing server..."
 
+# Configure server settings from environment variables
+CONFIG_FILE="$APP_DIR/config.json"
+
+# Update config.json if it exists and environment variables are set
+if [ -f "$CONFIG_FILE" ]; then
+    # Check if jq is available (should be installed in Dockerfile)
+    if ! command -v jq &> /dev/null; then
+        echo "WARNING: jq not found. Cannot update config.json. Please install jq in the Dockerfile."
+    else
+        # Update ServerName if SERVER_NAME is set
+        if [ -n "$SERVER_NAME" ]; then
+            echo "Setting ServerName to: $SERVER_NAME"
+            jq --arg name "$SERVER_NAME" '.ServerName = $name' "$CONFIG_FILE" > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+        fi
+        
+        # Update MOTD if SERVER_MOTD is set
+        if [ -n "$SERVER_MOTD" ]; then
+            echo "Setting MOTD to: $SERVER_MOTD"
+            jq --arg motd "$SERVER_MOTD" '.MOTD = $motd' "$CONFIG_FILE" > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+        fi
+        
+        # Update Password if SERVER_PASSWORD is set
+        if [ -n "$SERVER_PASSWORD" ]; then
+            echo "Setting server password"
+            jq --arg password "$SERVER_PASSWORD" '.Password = $password' "$CONFIG_FILE" > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+        fi
+        
+        # Update MaxPlayers if SERVER_MAX_PLAYERS is set
+        if [ -n "$SERVER_MAX_PLAYERS" ]; then
+            echo "Setting MaxPlayers to: $SERVER_MAX_PLAYERS"
+            jq --argjson max "$SERVER_MAX_PLAYERS" '.MaxPlayers = $max' "$CONFIG_FILE" > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+        fi
+        
+        # Update MaxViewRadius if SERVER_MAX_VIEW_RADIUS is set
+        if [ -n "$SERVER_MAX_VIEW_RADIUS" ]; then
+            echo "Setting MaxViewRadius to: $SERVER_MAX_VIEW_RADIUS"
+            jq --argjson radius "$SERVER_MAX_VIEW_RADIUS" '.MaxViewRadius = $radius' "$CONFIG_FILE" > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+        fi
+    fi
+else
+    echo "WARNING: config.json not found at $CONFIG_FILE"
+fi
+
+# Device Code Flow (RFC 8628) Authentication
+# Token storage location (single file with all tokens)
+TOKEN_FILE="$APP_DIR/tokens.json"
+
+# OAuth2 endpoints
+CLIENT_ID="hytale-server"
+DEVICE_AUTH_URL="https://oauth.accounts.hytale.com/oauth2/device/auth"
+TOKEN_URL="https://oauth.accounts.hytale.com/oauth2/token"
+SCOPE="openid offline auth:server"
+PROFILES_URL="https://account-data.hytale.com/my-account/get-profiles"
+SESSION_URL="https://sessions.hytale.com/game-session/new"
+PROFILES_URL="https://account-data.hytale.com/my-account/get-profiles"
+SESSION_URL="https://sessions.hytale.com/game-session/new"
+
+# Function to perform Device Code Flow authentication
+authenticate_device_flow() {
+    echo "==================================================================="
+    echo "DEVICE CODE FLOW AUTHENTICATION"
+    echo "==================================================================="
+    
+    # Request device code
+    echo "Requesting device code..."
+    AUTH_RESPONSE=$(curl -s -X POST "$DEVICE_AUTH_URL" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "client_id=$CLIENT_ID" \
+        -d "scope=$SCOPE")
+    
+    # Extract values using jq
+    DEVICE_CODE=$(echo "$AUTH_RESPONSE" | jq -r '.device_code // empty')
+    USER_CODE=$(echo "$AUTH_RESPONSE" | jq -r '.user_code // empty')
+    VERIFICATION_URI=$(echo "$AUTH_RESPONSE" | jq -r '.verification_uri // empty')
+    VERIFICATION_URI_COMPLETE=$(echo "$AUTH_RESPONSE" | jq -r '.verification_uri_complete // empty')
+    INTERVAL=$(echo "$AUTH_RESPONSE" | jq -r '.interval // 5')
+    EXPIRES_IN=$(echo "$AUTH_RESPONSE" | jq -r '.expires_in // 900')
+    
+    # Default interval if not provided
+    INTERVAL=${INTERVAL:-5}
+    EXPIRES_IN=${EXPIRES_IN:-900}
+    
+    if [ -z "$DEVICE_CODE" ] || [ -z "$USER_CODE" ]; then
+        echo "ERROR: Failed to obtain device code. Response: $AUTH_RESPONSE"
+        return 1
+    fi
+    
+    # Display instructions to user
+    echo ""
+    echo "Please visit the following URL to authenticate:"
+    echo "$VERIFICATION_URI_COMPLETE"
+    echo ""
+    echo "Or visit:"
+    echo "$VERIFICATION_URI"
+    echo "And enter the code: $USER_CODE"
+    echo ""
+    echo "Waiting for authorization (expires in $EXPIRES_IN seconds)..."
+    echo "==================================================================="
+    
+    # Poll for token
+    ELAPSED=0
+    while [ $ELAPSED -lt $EXPIRES_IN ]; do
+        sleep $INTERVAL
+        ELAPSED=$((ELAPSED + INTERVAL))
+        
+        TOKEN_RESPONSE=$(curl -s -X POST "$TOKEN_URL" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "client_id=$CLIENT_ID" \
+            -d "grant_type=urn:ietf:params:oauth:grant-type:device_code" \
+            -d "device_code=$DEVICE_CODE")
+        
+        ERROR=$(echo "$TOKEN_RESPONSE" | jq -r '.error // empty')
+        
+        if [ "$ERROR" = "authorization_pending" ]; then
+            echo "Still waiting for authorization... ($ELAPSED/$EXPIRES_IN seconds)"
+            continue
+        elif [ "$ERROR" = "slow_down" ]; then
+            INTERVAL=$((INTERVAL + 5))
+            echo "Rate limited, slowing down polling..."
+            continue
+        elif [ -n "$ERROR" ] && [ "$ERROR" != "null" ]; then
+            echo "ERROR: Authorization failed: $ERROR"
+            echo "Response: $TOKEN_RESPONSE"
+            return 1
+        else
+            # Success - extract tokens
+            ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty')
+            ID_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.id_token // empty')
+            REFRESH_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.refresh_token // empty')
+            
+            if [ -z "$ACCESS_TOKEN" ]; then
+                echo "ERROR: Failed to obtain access token. Response: $TOKEN_RESPONSE"
+                return 1
+            fi
+            
+            # Step 4: Get Available Profiles
+            echo "Getting available profiles..."
+            PROFILES_RESPONSE=$(curl -s -X GET "$PROFILES_URL" \
+                -H "Authorization: Bearer $ACCESS_TOKEN")
+            
+            # Extract profile UUID (use first profile or owner UUID if available)
+            PROFILE_UUID=$(echo "$PROFILES_RESPONSE" | jq -r '.profiles[0].uuid // .owner // empty')
+            
+            # Use HYTALE_SERVER_OWNER_UUID if set, otherwise use profile UUID
+            if [ -n "$HYTALE_SERVER_OWNER_UUID" ]; then
+                PROFILE_UUID="$HYTALE_SERVER_OWNER_UUID"
+                echo "Using profile UUID from HYTALE_SERVER_OWNER_UUID: $PROFILE_UUID"
+            elif [ -n "$PROFILE_UUID" ]; then
+                echo "Using profile UUID: $PROFILE_UUID"
+            else
+                echo "WARNING: Could not get profile UUID. Response: $PROFILES_RESPONSE"
+                echo "You may need to set HYTALE_SERVER_OWNER_UUID environment variable"
+                return 1
+            fi
+            
+            # Step 5: Create Game Session to get EdDSA tokens (sessionToken and identityToken)
+            echo "Creating game session..."
+            SESSION_RESPONSE=$(curl -s -X POST "$SESSION_URL" \
+                -H "Authorization: Bearer $ACCESS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "{\"uuid\":\"$PROFILE_UUID\"}")
+            
+            # Extract sessionToken and identityToken (EdDSA tokens)
+            SESSION_TOKEN=$(echo "$SESSION_RESPONSE" | jq -r '.sessionToken // empty')
+            IDENTITY_TOKEN=$(echo "$SESSION_RESPONSE" | jq -r '.identityToken // empty')
+            EXPIRES_AT=$(echo "$SESSION_RESPONSE" | jq -r '.expiresAt // empty')
+            
+            if [ -z "$SESSION_TOKEN" ] || [ -z "$IDENTITY_TOKEN" ]; then
+                echo "ERROR: Failed to get sessionToken and identityToken. Response: $SESSION_RESPONSE"
+                return 1
+            fi
+            
+            # Save tokens to single file (Hytale server EdDSA tokens)
+            jq -n \
+                --arg session_token "$SESSION_TOKEN" \
+                --arg identity_token "$IDENTITY_TOKEN" \
+                --arg refresh_token "$REFRESH_TOKEN" \
+                --arg access_token "$ACCESS_TOKEN" \
+                --arg profile_uuid "$PROFILE_UUID" \
+                --arg expires_at "$EXPIRES_AT" \
+                '{
+                    "sessionToken": $session_token,
+                    "identityToken": $identity_token,
+                    "refresh_token": $refresh_token,
+                    "access_token": $access_token,
+                    "profile_uuid": $profile_uuid,
+                    "expires_at": $expires_at
+                }' > "$TOKEN_FILE"
+            
+            echo ""
+            echo "==================================================================="
+            echo "AUTHORIZATION SUCCESSFUL!"
+            echo "Tokens saved to $APP_DIR"
+            echo "==================================================================="
+            return 0
+        fi
+    done
+    
+    echo "ERROR: Authorization timed out after $EXPIRES_IN seconds"
+    return 1
+}
+
+# Function to refresh tokens using refresh token
+refresh_tokens() {
+    if [ ! -f "$TOKEN_FILE" ]; then
+        return 1
+    fi
+    
+    REFRESH_TOKEN=$(jq -r '.refresh_token // empty' "$TOKEN_FILE")
+    
+    if [ -z "$REFRESH_TOKEN" ]; then
+        return 1
+    fi
+    
+    echo "Refreshing tokens..."
+    TOKEN_RESPONSE=$(curl -s -X POST "$TOKEN_URL" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "client_id=$CLIENT_ID" \
+        -d "grant_type=refresh_token" \
+        -d "refresh_token=$REFRESH_TOKEN")
+    
+    ERROR=$(echo "$TOKEN_RESPONSE" | jq -r '.error // empty')
+    
+    if [ -n "$ERROR" ] && [ "$ERROR" != "null" ]; then
+        echo "Token refresh failed: $ERROR"
+        return 1
+    fi
+    
+    # Extract and save new tokens
+    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty')
+    
+    if [ -n "$ACCESS_TOKEN" ]; then
+        echo "$TOKEN_RESPONSE" > "$TOKEN_FILE"
+        echo "Tokens refreshed successfully"
+        return 0
+    fi
+    
+    return 1
+}
+
+# Check if authentication is needed
+# Only authenticate if SERVER_AUTH_ENABLED is set and tokens don't exist
+if [ -n "$SERVER_AUTH_ENABLED" ]; then
+    if [ ! -f "$TOKEN_FILE" ]; then
+        echo "Authentication required..."
+
+        authenticate_device_flow
+
+        if [ $? -ne 0 ]; then
+            echo "WARNING: Authentication failed. Server may not start properly."
+            echo "You can disable authentication by removing SERVER_AUTH_ENABLED or"
+            echo "manually authenticate using: /auth login device"
+        fi
+    else
+        # Try to refresh tokens if refresh token exists in the file
+        REFRESH_TOKEN=$(jq -r '.refresh_token // empty' "$TOKEN_FILE" 2>/dev/null)
+        if [ -n "$REFRESH_TOKEN" ]; then
+            refresh_tokens || echo "Token refresh failed, using existing tokens"
+        fi
+
+        echo "Using existing authentication tokens"
+    fi
+fi
+
 # Prepare the command line
 COMMAND_LINE="java"
 
@@ -160,6 +430,47 @@ SERVER_BACKUP_INTERVAL="${SERVER_BACKUP_INTERVAL:-10}"
 
 # Add the backup flag to the command line
 COMMAND_LINE="$COMMAND_LINE --backup --backup-dir $SERVER_BACKUP_DIR --backup-frequency $SERVER_BACKUP_INTERVAL"
+
+# Method C: Token Passthrough (Environment/CLI)
+# Support both environment variables and CLI arguments
+# Priority: Environment variables > tokens.json > CLI arguments
+
+# Check for session token (environment variable takes precedence)
+if [ -n "$HYTALE_SERVER_SESSION_TOKEN" ]; then
+    SESSION_TOKEN="$HYTALE_SERVER_SESSION_TOKEN"
+    echo "Using session token from HYTALE_SERVER_SESSION_TOKEN environment variable"
+elif [ -n "$SERVER_AUTH_ENABLED" ] && [ -f "$TOKEN_FILE" ]; then
+    # Get sessionToken from tokens.json (Hytale server EdDSA token)
+    SESSION_TOKEN=$(jq -r '.sessionToken // empty' "$TOKEN_FILE" 2>/dev/null)
+    if [ -n "$SESSION_TOKEN" ] && [ "$SESSION_TOKEN" != "null" ]; then
+        echo "Using session token from $TOKEN_FILE"
+    fi
+fi
+
+# Check for identity token (environment variable takes precedence)
+if [ -n "$HYTALE_SERVER_IDENTITY_TOKEN" ]; then
+    IDENTITY_TOKEN="$HYTALE_SERVER_IDENTITY_TOKEN"
+    echo "Using identity token from HYTALE_SERVER_IDENTITY_TOKEN environment variable"
+elif [ -n "$SERVER_AUTH_ENABLED" ] && [ -f "$TOKEN_FILE" ]; then
+    # Get identityToken from tokens.json (Hytale server EdDSA token)
+    IDENTITY_TOKEN=$(jq -r '.identityToken // empty' "$TOKEN_FILE" 2>/dev/null)
+    if [ -n "$IDENTITY_TOKEN" ] && [ "$IDENTITY_TOKEN" != "null" ]; then
+        echo "Using identity token from $TOKEN_FILE"
+    fi
+fi
+
+# Export environment variables for Method C (if tokens are available)
+if [ -n "$SESSION_TOKEN" ]; then
+    export HYTALE_SERVER_SESSION_TOKEN="$SESSION_TOKEN"
+fi
+
+if [ -n "$IDENTITY_TOKEN" ]; then
+    export HYTALE_SERVER_IDENTITY_TOKEN="$IDENTITY_TOKEN"
+fi
+
+if [ -n "$HYTALE_SERVER_AUDIENCE" ]; then
+    export HYTALE_SERVER_AUDIENCE="$HYTALE_SERVER_AUDIENCE"
+fi
 
 # Run the server
 $COMMAND_LINE
