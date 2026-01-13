@@ -23,16 +23,6 @@ A pre-built Docker image is available on GitHub Container Registry:
 - **Image**: `ghcr.io/machinastudios/hytale-docker`
 - **Usage**: You can use this image directly without building it yourself
 
-## Project Structure
-
-```
-hytale-docker/
-├── docker-compose.yml    # Docker Compose service definition
-├── Dockerimage           # Dockerfile for building the Hytale server image
-├── entrypoint.sh         # Entrypoint script that configures and starts the server
-└── README.md             # This documentation file
-```
-
 ## Prerequisites
 
 - Docker Engine (version 20.10 or later)
