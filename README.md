@@ -50,7 +50,10 @@ docker pull ghcr.io/machinastudios/hytale-docker
 docker run -d \
   --name hytale \
   -p 5520:5520 \
-  -v ./data:/hytale \
+  -v ./backups:/hytale/backups \
+  -v ./mods:/hytale/mods \
+  -v ./logs:/hytale/logs \
+  -v ./universe:/hytale/universe \
   ghcr.io/machinastudios/hytale-docker
 ```
 
@@ -83,14 +86,16 @@ The server can be configured using environment variables in `docker-compose.yml`
 
 #### `SERVER_ASSETS_ZIP`
 - **Description**: URL or local file path to a ZIP file containing server assets
-- **Default**: Empty (not used if not set)
+- **Default**: Empty (assets are extracted automatically by Hytale if not specified)
 - **Format**: Can be either a URL (e.g., `https://example.com/assets.zip`) or a local file path (e.g., `/hytale/assets.zip`)
 - **Examples**: 
   - URL: `https://example.com/assets.zip`
   - Local file: `/hytale/custom-assets.zip`
 - **Usage**: 
-  - If set to a **local file path** (file exists), the server will use it directly
-  - If set to a **URL**, the server will download the assets ZIP file before using it
+  - **If not set**: Hytale will automatically extract and use the default assets (no action needed)
+  - **If set to a local file path** (file exists), the server will use it directly
+  - **If set to a URL**, the server will download the assets ZIP file before using it
+- **Note**: Only set this variable if you need to use custom assets. The default Hytale assets are included automatically.
 
 #### `SERVER_ACCEPT_EARLY_PLUGINS`
 - **Description**: Enable early plugin loading (accept plugins before they are fully validated)
@@ -153,11 +158,27 @@ The Hytale downloader can be configured using environment variables. These varia
 
 ### Volume Mounts
 
-The configuration mounts a local `./data` directory to `/hytale` in the container:
+**Recommended Configuration**: Mount specific directories for better organization and control:
 
-- **Host Path**: `./data`
+```yaml
+volumes:
+    - ./backups:/hytale/backups
+    - ./mods:/hytale/mods
+    - ./logs:/hytale/logs
+    - ./universe:/hytale/universe
+```
+
+**Directory Mappings**:
+- **Backups** (`./backups` → `/hytale/backups`): Server backup files
+- **Mods** (`./mods` → `/hytale/mods`): Server mods and plugins
+- **Logs** (`./logs` → `/hytale/logs`): Server log files
+- **Universe** (`./universe` → `/hytale/universe`): Server worlds and universe data
+
+**Alternative Configuration**: You can also mount the entire `/hytale` directory:
+
+- **Host Path**: `./data` (or `./hytale`)
 - **Container Path**: `/hytale`
-- **Purpose**: Persistent storage for server data, worlds, configurations, and backups
+- **Purpose**: Persistent storage for all server data, configurations, worlds, backups, mods, and logs
 
 ## File Descriptions
 
@@ -198,9 +219,11 @@ The entrypoint script that runs when the container starts:
    - Supports downloader configuration via environment variables
    - Downloads/updates server files before starting the server (unless `DOWNLOADER_SKIP_UPDATE_CHECK` is set)
    - If credentials are not provided, the downloader will display an authorization URL and code in the logs on first run
-2. **Asset Handling**: If `SERVER_ASSETS_ZIP` is set:
-   - If it's a local file path (file exists), uses it directly
-   - If it's a URL, downloads the assets ZIP file before using it
+2. **Asset Handling**: 
+   - **If `SERVER_ASSETS_ZIP` is not set**: Hytale automatically extracts and uses default assets (no configuration needed)
+   - **If `SERVER_ASSETS_ZIP` is set**: 
+     - If it's a local file path (file exists), uses it directly
+     - If it's a URL, downloads the assets ZIP file before using it
 3. **Command Building**: Dynamically builds the Java command line based on environment variables:
    - `--assets`: Includes custom assets ZIP if provided
    - `--accept-early-plugins`: Enables early plugin loading if configured
@@ -249,7 +272,10 @@ services:
         ports:
             - "5520:5520"
         volumes:
-            - ./data:/hytale
+            - ./backups:/hytale/backups
+            - ./mods:/hytale/mods
+            - ./logs:/hytale/logs
+            - ./universe:/hytale/universe
         environment:
             - SERVER_ACCEPT_EARLY_PLUGINS=true
             - SERVER_BIND=0.0.0.0:5520
@@ -297,7 +323,10 @@ docker pull ghcr.io/machinastudios/hytale-docker
 docker run -d \
   --name hytale \
   -p 5520:5520 \
-  -v ./data:/hytale \
+  -v ./backups:/hytale/backups \
+  -v ./mods:/hytale/mods \
+  -v ./logs:/hytale/logs \
+  -v ./universe:/hytale/universe \
   -e SERVER_ASSETS_ZIP="" \
   -e SERVER_ACCEPT_EARLY_PLUGINS="true" \
   -e SERVER_BIND="0.0.0.0:5520" \
@@ -316,7 +345,10 @@ docker build -f Dockerimage -t hytale-server .
 docker run -d \
   --name hytale \
   -p 5520:5520 \
-  -v ./data:/hytale \
+  -v ./backups:/hytale/backups \
+  -v ./mods:/hytale/mods \
+  -v ./logs:/hytale/logs \
+  -v ./universe:/hytale/universe \
   -e SERVER_ASSETS_ZIP="" \
   -e SERVER_ACCEPT_EARLY_PLUGINS="true" \
   -e SERVER_BIND="0.0.0.0:5520" \
@@ -338,19 +370,23 @@ The default configuration maps port 5520 (default Hytale server port) from the c
 
 ## Data Persistence
 
-All server data is stored in the `./data` directory on your host machine:
+Server data is stored in separate directories on your host machine (recommended configuration):
 
-- **Server Files**: Configuration files, worlds, player data
-- **Backups**: Automated backups (if enabled) in `./data/backups`
-- **Logs**: Server logs and console output
+- **Backups** (`./backups`): Automated backups (if enabled)
+- **Mods** (`./mods`): Server mods and plugins
+- **Logs** (`./logs`): Server log files
+- **Universe** (`./universe`): Server worlds and universe data
+- **Configuration Files**: Stored inside the container (can be persisted by mounting `/hytale` if needed)
 
-**Important**: Ensure the `./data` directory has proper permissions for the container to write files.
+**Important**: Ensure all mounted directories have proper permissions for the container to write files.
+
+**Alternative**: You can mount the entire `/hytale` directory as `./data:/hytale` to persist all server files including configurations, but the recommended approach is to use separate volumes for better organization.
 
 ## Backup System
 
 The backup system is automatically configured when `SERVER_BACKUP_DIR` is set:
 
-- **Backups Location**: `/hytale/backups` (mapped to `./data/backups` on host)
+- **Backups Location**: `/hytale/backups` (mapped to `./backups` on host with recommended configuration)
 - **Backup Interval**: Configurable via `SERVER_BACKUP_INTERVAL` (in minutes)
 - **Automatic Creation**: Backups are created automatically at the specified interval
 
@@ -395,10 +431,20 @@ On the first run, if credentials are not provided, the downloader will require a
 5. **For persistent credentials**: Mount a volume to the credentials file location:
    ```yaml
    volumes:
-       - ./data:/hytale
+       - ./backups:/hytale/backups
+       - ./mods:/hytale/mods
+       - ./logs:/hytale/logs
+       - ./universe:/hytale/universe
        - ./credentials:/hytale/.hytale-downloader-credentials.json
    ```
    Then set `DOWNLOADER_CREDENTIALS_PATH=/hytale/.hytale-downloader-credentials.json`
+   
+   Alternatively, if using a full `/hytale` mount:
+   ```yaml
+   volumes:
+       - ./data:/hytale
+   ```
+   The credentials will be automatically persisted in `./data/.hytale-downloader-credentials.json`
 
 ### Port Already in Use
 
@@ -410,7 +456,17 @@ If port 5520 is already in use:
 
 ### Permission Issues
 
-If the server cannot write to the data directory:
+If the server cannot write to the mounted directories:
+
+```bash
+# On Linux/macOS - set permissions for all recommended directories
+chmod -R 777 ./backups ./mods ./logs ./universe
+
+# Or set ownership to the Docker user
+sudo chown -R 1000:1000 ./backups ./mods ./logs ./universe
+```
+
+If using the alternative full mount approach:
 
 ```bash
 # On Linux/macOS
@@ -453,6 +509,11 @@ To remove all containers, volumes, and data (**WARNING**: This deletes server da
 
 ```bash
 docker-compose down -v
+
+# If using recommended separate volumes
+rm -rf ./backups ./mods ./logs ./universe
+
+# If using alternative full mount
 rm -rf ./data
 ```
 

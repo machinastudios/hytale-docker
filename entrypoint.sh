@@ -15,7 +15,7 @@ cd $APP_DIR
 DOWNLOADER_CMD="/bin/hytale-downloader"
 
 # Create a tmp file
-DOWNLOADER_TMP_FILE=$(mktemp)
+DOWNLOADER_TMP_FILE="/tmp/server-files.zip"
 
 # Delete the tmp file on exit
 trap "rm -f $DOWNLOADER_TMP_FILE" EXIT
@@ -42,23 +42,30 @@ fi
 # Check if HytaleServer.jar exists - if not, run downloader even if skip is set
 if [ ! -f "$APP_DIR/HytaleServer.jar" ] || [ -z "$DOWNLOADER_SKIP_UPDATE_CHECK" ]; then
     if [ -z "$DOWNLOADER_SKIP_UPDATE_CHECK" ]; then
-        echo "Checking for updates..."
+        echo "checking for updates..."
     else
-        echo "Downloading server files for the first time..."
+        echo "running the downloader for the first time..."
     fi
 
-    # Run the downloader to download/update server files
-    $DOWNLOADER_CMD $DOWNLOADER_ARGS
+    # If a server-files.zip file is not found, exit
+    if [ ! -f "$DOWNLOADER_TMP_FILE" ]; then
+        echo "downloading server files..."
+
+        # Run the downloader to download/update server files
+        $DOWNLOADER_CMD $DOWNLOADER_ARGS
+    else
+        echo "server files already downloaded, skipping downloader"
+    fi
 
     # If the update failed, exit
     if [ $? -ne 0 ]; then
-        echo "Failed to update server files"
+        echo "failed to update server files"
         exit 1
     fi
 
     # If server files where downloaded
     if [ -f "$DOWNLOADER_TMP_FILE" ]; then
-        echo "Unzipping server files..."
+        echo "unzipping server files..."
 
         # Create a tmp folder
         TMP_FOLDER=$(mktemp -d)
@@ -74,8 +81,17 @@ if [ ! -f "$APP_DIR/HytaleServer.jar" ] || [ -z "$DOWNLOADER_SKIP_UPDATE_CHECK" 
         # Copy the `Server` folder to the app directory
         cp -r $TMP_FOLDER/Server/* $APP_DIR
 
+        # If no assets zip is found specified, use the default one
+        if [ -z "$SERVER_ASSETS_ZIP" ]; then
+            # Set the assets zip to the default one
+            SERVER_ASSETS_ZIP=$TMP_FOLDER/Assets.zip
+
+            # Copy the `Assets.zip` file to the app directory
+            cp $TMP_FOLDER/Assets.zip $APP_DIR/Assets.zip
+        fi
+
         if [ $? -ne 0 ]; then
-            echo "Failed to unzip server files"
+            echo "failed to unzip server files"
             exit 1
         fi
 
@@ -84,23 +100,26 @@ if [ ! -f "$APP_DIR/HytaleServer.jar" ] || [ -z "$DOWNLOADER_SKIP_UPDATE_CHECK" 
     fi
 fi
 
-echo "Initializing server..."
+echo "initializing server..."
 
 # Prepare the command line
 COMMAND_LINE="java -jar $APP_DIR/HytaleServer.jar"
 
-# If the SERVER_ASSETS_ZIP environment variable is set
+# If a custom assets zip is specified, use it
 if [ -n "$SERVER_ASSETS_ZIP" ]; then
     # If it's a local file, add it to the command line
     if [ -f "$SERVER_ASSETS_ZIP" ]; then
         COMMAND_LINE="$COMMAND_LINE --assets $SERVER_ASSETS_ZIP"
     else
         # Download the assets zip
-        wget -O $APP_DIR/assets.zip $SERVER_ASSETS_ZIP
+        wget -O $APP_DIR/Assets.zip $SERVER_ASSETS_ZIP
 
         # Add the assets zip to the command line
-        COMMAND_LINE="$COMMAND_LINE --assets $APP_DIR/assets.zip"
+        COMMAND_LINE="$COMMAND_LINE --assets $APP_DIR/Assets.zip"
     fi
+else
+    # Add the assets zip to the command line
+    COMMAND_LINE="$COMMAND_LINE --assets $APP_DIR/Assets.zip"
 fi
 
 # If the SERVER_ACCEPT_EARLY_PLUGINS environment variable is set
