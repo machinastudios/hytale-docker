@@ -41,10 +41,16 @@ if [ -n "$SERVER_BIND" ]; then
     COMMAND_LINE="$COMMAND_LINE --bind $SERVER_BIND"
 fi
 
-# If the SERVER_BACKUP_DIR environment variable is set
-if [ -n "$SERVER_BACKUP_DIR" ]; then
-    # Add the backup directory flag to the command line
-    COMMAND_LINE="$COMMAND_LINE --backup --backup-dir $SERVER_BACKUP_DIR"
+# If the SERVER_BACKUP or SERVER_BACKUP_DIR environment variable is set
+if [ -n "$SERVER_BACKUP" ] || [ -n "$SERVER_BACKUP_DIR" ] then
+    # Add the backup flag to the command line
+    COMMAND_LINE="$COMMAND_LINE --backup"
+
+    # If the SERVER_BACKUP_DIR environment variable is set
+    if [ -n "$SERVER_BACKUP_DIR" ]; then
+        # Add the backup directory flag to the command line
+        COMMAND_LINE="$COMMAND_LINE --backup-dir $SERVER_BACKUP_DIR"
+    fi
 
     # If the SERVER_BACKUP_INTERVAL environment variable is set
     if [ -n "$SERVER_BACKUP_INTERVAL" ]; then

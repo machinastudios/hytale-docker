@@ -49,8 +49,8 @@ docker pull ghcr.io/machinastudios/hytale-docker
 ```bash
 docker run -d \
   --name hytale \
-  -p 25565:25565 \
-  -v ./data:/data \
+  -p 5520:5520 \
+  -v ./data:/hytale \
   ghcr.io/machinastudios/hytale-docker
 ```
 
@@ -84,10 +84,10 @@ The server can be configured using environment variables in `docker-compose.yml`
 #### `SERVER_ASSETS_ZIP`
 - **Description**: URL or local file path to a ZIP file containing server assets
 - **Default**: Empty (not used if not set)
-- **Format**: Can be either a URL (e.g., `https://example.com/assets.zip`) or a local file path (e.g., `/data/assets.zip`)
+- **Format**: Can be either a URL (e.g., `https://example.com/assets.zip`) or a local file path (e.g., `/hytale/assets.zip`)
 - **Examples**: 
   - URL: `https://example.com/assets.zip`
-  - Local file: `/data/custom-assets.zip`
+  - Local file: `/hytale/custom-assets.zip`
 - **Usage**: 
   - If set to a **local file path** (file exists), the server will use it directly
   - If set to a **URL**, the server will download the assets ZIP file before using it
@@ -105,7 +105,7 @@ The server can be configured using environment variables in `docker-compose.yml`
 
 #### `SERVER_BACKUP_DIR`
 - **Description**: Directory where server backups will be stored
-- **Default**: `/data/backups`
+- **Default**: `/hytale/backups`
 - **Usage**: Must be set for backup functionality to work. The directory will be created automatically
 
 #### `SERVER_BACKUP_INTERVAL`
@@ -115,10 +115,10 @@ The server can be configured using environment variables in `docker-compose.yml`
 
 ### Volume Mounts
 
-The configuration mounts a local `./data` directory to `/data` in the container:
+The configuration mounts a local `./data` directory to `/hytale` in the container:
 
 - **Host Path**: `./data`
-- **Container Path**: `/data`
+- **Container Path**: `/hytale`
 - **Purpose**: Persistent storage for server data, worlds, configurations, and backups
 
 ## File Descriptions
@@ -129,8 +129,8 @@ Defines the Docker Compose service configuration:
 
 - **Service Name**: `hytale`
 - **Build**: Builds from the local Dockerfile (`.`) or can be configured to use the pre-built image `ghcr.io/machinastudios/hytale-docker`
-- **Port Mapping**: `25565:25565` (maps container port 25565 to host port 25565)
-- **Volumes**: Maps `./data` to `/data` for persistent storage
+- **Port Mapping**: `5520:5520` (maps container port 5520 to host port 5520)
+- **Volumes**: Maps `./data` to `/hytale` for persistent storage
 - **Environment Variables**: Configures server behavior and settings
 
 **Note**: To use the pre-built image instead of building from source, replace `build: .` with:
@@ -149,7 +149,7 @@ The Docker image definition that:
    - Downloads the Hytale downloader from the official URL
    - Extracts and executes the downloader to fetch server files
    - Cleans up temporary files
-3. **Exposed Port**: 25565 (default Minecraft/Hytale server port)
+3. **Exposed Port**: 5520 (default Hytale server port)
 4. **Entrypoint**: Executes `entrypoint.sh` to start the server
 
 ### entrypoint.sh
@@ -206,14 +206,13 @@ services:
     hytale:
         image: ghcr.io/machinastudios/hytale-docker
         ports:
-            - "25565:25565"
+            - "5520:5520"
         volumes:
-            - ./data:/data
+            - ./data:/hytale
         environment:
-            - SERVER_ASSETS_ZIP=
             - SERVER_ACCEPT_EARLY_PLUGINS=true
             - SERVER_BIND=0.0.0.0:5520
-            - SERVER_BACKUP_DIR=/data/backups
+            - SERVER_BACKUP_DIR=/hytale/backups
             - SERVER_BACKUP_INTERVAL=10
 ```
 
@@ -256,12 +255,12 @@ docker pull ghcr.io/machinastudios/hytale-docker
 # Run the container
 docker run -d \
   --name hytale \
-  -p 25565:25565 \
-  -v ./data:/data \
+  -p 5520:5520 \
+  -v ./data:/hytale \
   -e SERVER_ASSETS_ZIP="" \
   -e SERVER_ACCEPT_EARLY_PLUGINS="true" \
   -e SERVER_BIND="0.0.0.0:5520" \
-  -e SERVER_BACKUP_DIR="/data/backups" \
+  -e SERVER_BACKUP_DIR="/hytale/backups" \
   -e SERVER_BACKUP_INTERVAL="10" \
   ghcr.io/machinastudios/hytale-docker
 ```
@@ -275,24 +274,24 @@ docker build -f Dockerimage -t hytale-server .
 # Run the container
 docker run -d \
   --name hytale \
-  -p 25565:25565 \
-  -v ./data:/data \
+  -p 5520:5520 \
+  -v ./data:/hytale \
   -e SERVER_ASSETS_ZIP="" \
   -e SERVER_ACCEPT_EARLY_PLUGINS="true" \
   -e SERVER_BIND="0.0.0.0:5520" \
-  -e SERVER_BACKUP_DIR="/data/backups" \
+  -e SERVER_BACKUP_DIR="/hytale/backups" \
   -e SERVER_BACKUP_INTERVAL="10" \
   hytale-server
 ```
 
 ## Port Configuration
 
-The default configuration maps port 25565 (standard Minecraft/Hytale port) from the container to the host. To change the port:
+The default configuration maps port 5520 (default Hytale server port) from the container to the host. To change the port:
 
 1. Modify `docker-compose.yml`:
    ```yaml
    ports:
-       - "YOUR_PORT:25565"
+       - "YOUR_PORT:5520"
    ```
 2. Ensure `SERVER_BIND` matches if you want the server to listen on a specific interface
 
@@ -310,7 +309,7 @@ All server data is stored in the `./data` directory on your host machine:
 
 The backup system is automatically configured when `SERVER_BACKUP_DIR` is set:
 
-- **Backups Location**: `/data/backups` (mapped to `./data/backups` on host)
+- **Backups Location**: `/hytale/backups` (mapped to `./data/backups` on host)
 - **Backup Interval**: Configurable via `SERVER_BACKUP_INTERVAL` (in minutes)
 - **Automatic Creation**: Backups are created automatically at the specified interval
 
@@ -335,11 +334,11 @@ The backup system is automatically configured when `SERVER_BACKUP_DIR` is set:
 
 ### Port Already in Use
 
-If port 25565 is already in use:
+If port 5520 is already in use:
 
 1. Change the port mapping in `docker-compose.yml`
 2. Update firewall rules if necessary
-3. Ensure no other Minecraft/Hytale servers are running
+3. Ensure no other Hytale servers are running
 
 ### Permission Issues
 
@@ -412,4 +411,4 @@ This project is a Docker setup for the Hytale server. Please refer to Hytale's o
 For issues related to:
 - **Docker setup**: Check this repository's issues
 - **Hytale server**: Refer to official Hytale documentation and support channels
-- **Server configuration**: Review Hytale server documentation for available options
+- **Server configuration**: Review the [Hytale Server Manual](https://support.hytale.com/hc/en-us/articles/45326769420827-Hytale-Server-Manual) for available options
