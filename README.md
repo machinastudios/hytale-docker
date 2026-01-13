@@ -28,6 +28,38 @@ A pre-built Docker image is available on GitHub Container Registry:
 - Docker Engine (version 20.10 or later)
 - Docker Compose (version 1.29 or later)
 
+## Quick Start
+
+Create a `docker-compose.yml` file:
+
+```yaml
+services:
+    hytale:
+        image: ghcr.io/machinastudios/hytale-docker
+        ports:
+            - "5520:5520/udp"
+        volumes:
+            - ./backups:/hytale/backups
+            - ./mods:/hytale/mods
+            - ./logs:/hytale/logs
+            - ./universe:/hytale/universe
+        environment:
+            - SERVER_ACCEPT_EARLY_PLUGINS=true
+            - SERVER_BIND=0.0.0.0:5520
+            - SERVER_BACKUP_DIR=/hytale/backups
+            - SERVER_BACKUP_INTERVAL=10
+```
+
+Then start the server:
+
+```bash
+docker-compose up -d
+```
+
+For detailed documentation, see:
+- 🇺🇸 [English (EN)](./docs/en/Getting%20Started.md)
+- 🇧🇷 [Português (PT-BR)](./docs/pt-BR/Iniciando.md)
+
 ## Notes
 
 - The Hytale server requires Java 22 (provided by the OpenJDK base image)

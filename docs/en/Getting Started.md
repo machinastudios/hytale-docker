@@ -50,7 +50,7 @@ docker pull ghcr.io/machinastudios/hytale-docker
 ```bash
 docker run -d \
   --name hytale \
-  -p 5520:5520 \
+  -p 5520:5520/udp \
   -v ./backups:/hytale/backups \
   -v ./mods:/hytale/mods \
   -v ./logs:/hytale/logs \
@@ -217,7 +217,7 @@ Defines the Docker Compose service configuration:
 
 - **Service Name**: `hytale`
 - **Build**: Builds from the local Dockerfile (`.`) or can be configured to use the pre-built image `ghcr.io/machinastudios/hytale-docker`
-- **Port Mapping**: `5520:5520` (maps container port 5520 to host port 5520)
+- **Port Mapping**: `5520:5520/udp` (maps container port 5520 to host port 5520 using UDP protocol)
 - **Volumes**: Recommended to mount specific directories (`./backups`, `./mods`, `./logs`, `./universe`) or mount entire `/hytale` directory
 - **Environment Variables**: Configures server behavior and settings
 - **System Optimizations**: Includes Linux system optimizations via `sysctls` and `ulimits`:
@@ -306,7 +306,7 @@ services:
     hytale:
         image: ghcr.io/machinastudios/hytale-docker
         ports:
-            - "5520:5520"
+            - "5520:5520/udp"
         volumes:
             - ./backups:/hytale/backups
             - ./mods:/hytale/mods
@@ -369,7 +369,7 @@ docker pull ghcr.io/machinastudios/hytale-docker
 # Run the container
 docker run -d \
   --name hytale \
-  -p 5520:5520 \
+  -p 5520:5520/udp \
   -v ./backups:/hytale/backups \
   -v ./mods:/hytale/mods \
   -v ./logs:/hytale/logs \
@@ -391,7 +391,7 @@ docker build -f Dockerimage -t hytale-server .
 # Run the container
 docker run -d \
   --name hytale \
-  -p 5520:5520 \
+  -p 5520:5520/udp \
   -v ./backups:/hytale/backups \
   -v ./mods:/hytale/mods \
   -v ./logs:/hytale/logs \

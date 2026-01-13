@@ -43,7 +43,7 @@ docker pull ghcr.io/machinastudios/hytale-docker
 ```bash
 docker run -d \
   --name hytale \
-  -p 5520:5520 \
+  -p 5520:5520/udp \
   -v ./backups:/hytale/backups \
   -v ./mods:/hytale/mods \
   -v ./logs:/hytale/logs \
@@ -210,7 +210,7 @@ Define a configuração do serviço Docker Compose:
 
 - **Nome do Serviço**: `hytale`
 - **Build**: Constrói a partir do Dockerfile local (`.`) ou pode ser configurado para usar a imagem pré-construída `ghcr.io/machinastudios/hytale-docker`
-- **Mapeamento de Porta**: `5520:5520` (mapeia porta 5520 do container para porta 5520 do host)
+- **Mapeamento de Porta**: `5520:5520/udp` (mapeia porta 5520 do container para porta 5520 do host usando protocolo UDP)
 - **Volumes**: Recomendado montar diretórios específicos (`./backups`, `./mods`, `./logs`, `./universe`) ou montar todo o diretório `/hytale`
 - **Variáveis de Ambiente**: Configura comportamento e configurações do servidor
 - **Otimizações de Sistema**: Inclui otimizações de sistema Linux via `sysctls` e `ulimits`:
@@ -299,7 +299,7 @@ services:
     hytale:
         image: ghcr.io/machinastudios/hytale-docker
         ports:
-            - "5520:5520"
+            - "5520:5520/udp"
         volumes:
             - ./backups:/hytale/backups
             - ./mods:/hytale/mods
@@ -364,7 +364,7 @@ docker pull ghcr.io/machinastudios/hytale-docker
 # Executar o container
 docker run -d \
   --name hytale \
-  -p 5520:5520 \
+  -p 5520:5520/udp \
   -v ./backups:/hytale/backups \
   -v ./mods:/hytale/mods \
   -v ./logs:/hytale/logs \
@@ -386,7 +386,7 @@ docker build -f Dockerimage -t hytale-server .
 # Executar o container
 docker run -d \
   --name hytale \
-  -p 5520:5520 \
+  -p 5520:5520/udp \
   -v ./backups:/hytale/backups \
   -v ./mods:/hytale/mods \
   -v ./logs:/hytale/logs \

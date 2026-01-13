@@ -2,7 +2,7 @@ services:
     hytale:
         build: .
         ports:
-            - "5520:5520"
+            - "5520:5520/udp"
         volumes:
             - ./hytale:/hytale
         environment:
