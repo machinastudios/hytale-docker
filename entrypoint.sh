@@ -1,6 +1,9 @@
 #!/bin/bash
 # Entrypoint for the Hytale server - dockerized
 
+# Display any errors when exiting
+set -e
+
 # For now, we will ignore the update check
 # because we don't know how to handle them
 DOWNLOADER_SKIP_UPDATE_CHECK="true"
@@ -103,7 +106,24 @@ fi
 echo "initializing server..."
 
 # Prepare the command line
-COMMAND_LINE="java -jar $APP_DIR/HytaleServer.jar"
+COMMAND_LINE="java"
+
+# Add memory settings if specified
+if [ -n "$SERVER_MIN_RAM" ]; then
+    COMMAND_LINE="$COMMAND_LINE -Xms$SERVER_MIN_RAM"
+fi
+
+if [ -n "$SERVER_MAX_RAM" ]; then
+    COMMAND_LINE="$COMMAND_LINE -Xmx$SERVER_MAX_RAM"
+fi
+
+# Add custom JVM arguments if specified
+if [ -n "$JAVA_JVM_ARGS" ]; then
+    COMMAND_LINE="$COMMAND_LINE $JAVA_JVM_ARGS"
+fi
+
+# Add the jar file to the command line
+COMMAND_LINE="$COMMAND_LINE -jar $APP_DIR/HytaleServer.jar"
 
 # If a custom assets zip is specified, use it
 if [ -n "$SERVER_ASSETS_ZIP" ]; then

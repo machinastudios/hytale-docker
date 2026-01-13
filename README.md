@@ -112,6 +112,34 @@ The server can be configured using environment variables in `docker-compose.yml`
 - **Default**: `10`
 - **Usage**: Only used if `SERVER_BACKUP_DIR` is set. Defines how often backups are created
 
+#### `SERVER_MIN_RAM`
+- **Description**: Minimum RAM allocation for the Java process
+- **Default**: Empty (uses JVM default)
+- **Format**: Memory size with unit (e.g., `2G`, `4096M`, `512M`)
+- **Examples**: `2G`, `4096M`, `512M`
+- **Usage**: Set the initial heap size. This is converted to `-Xms` JVM argument
+- **Note**: Use this for easy memory configuration instead of `JAVA_JVM_ARGS`
+
+#### `SERVER_MAX_RAM`
+- **Description**: Maximum RAM allocation for the Java process
+- **Default**: Empty (uses JVM default)
+- **Format**: Memory size with unit (e.g., `4G`, `8192M`, `1024M`)
+- **Examples**: `4G`, `8192M`, `1024M`
+- **Usage**: Set the maximum heap size. This is converted to `-Xmx` JVM argument
+- **Note**: Use this for easy memory configuration instead of `JAVA_JVM_ARGS`
+
+#### `JAVA_JVM_ARGS`
+- **Description**: Additional JVM arguments to pass to the Java process
+- **Default**: Empty (uses default JVM settings)
+- **Format**: Space-separated JVM arguments (e.g., `-XX:+UseG1GC -XX:MaxGCPauseMillis=200`)
+- **Examples**:
+  - GC tuning: `-XX:+UseG1GC -XX:MaxGCPauseMillis=200`
+  - Debug options: `-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005`
+- **Usage**: Set to any JVM arguments you want to pass to the Java process running the Hytale server
+- **Note**: 
+  - These arguments are passed after memory settings (`SERVER_MIN_RAM`/`SERVER_MAX_RAM`) and before the `-jar` flag
+  - For memory configuration, prefer using `SERVER_MIN_RAM` and `SERVER_MAX_RAM` for simplicity
+
 ### Downloader Configuration
 
 The Hytale downloader can be configured using environment variables. These variables control how the downloader fetches and updates server files:
@@ -183,13 +211,19 @@ Defines the Docker Compose service configuration:
 - **Service Name**: `hytale`
 - **Build**: Builds from the local Dockerfile (`.`) or can be configured to use the pre-built image `ghcr.io/machinastudios/hytale-docker`
 - **Port Mapping**: `5520:5520` (maps container port 5520 to host port 5520)
-- **Volumes**: Maps `./data` to `/hytale` for persistent storage
+- **Volumes**: Recommended to mount specific directories (`./backups`, `./mods`, `./logs`, `./universe`) or mount entire `/hytale` directory
 - **Environment Variables**: Configures server behavior and settings
+- **System Optimizations**: Includes Linux system optimizations via `sysctls` and `ulimits`:
+  - **Network**: Increased socket connections (`net.core.somaxconn=4096`), TCP backlog, and port ranges for better performance
+  - **File System**: Increased file descriptor limits via `ulimits` (`nofile: 1048576`) for handling many files/inodes
+  - **Note**: Some system-wide parameters like `vm.swappiness`, `vm.max_map_count`, and `fs.file-max` cannot be configured per-container and must be set on the Docker host system if needed
 
 **Note**: To use the pre-built image instead of building from source, replace `build: .` with:
 ```yaml
 image: ghcr.io/machinastudios/hytale-docker
 ```
+
+**System Optimizations**: The configuration includes optimized Linux kernel parameters for game server performance. Network optimizations are applied at the container level via `sysctls`, while file descriptor limits are set via `ulimits`. Note that some parameters like `vm.swappiness`, `vm.max_map_count`, and `fs.file-max` are system-wide and cannot be configured per-container - they must be set on the Docker host system if customization is needed.
 
 ### Dockerimage (Dockerfile)
 
@@ -219,6 +253,7 @@ The entrypoint script that runs when the container starts:
      - If it's a local file path (file exists), uses it directly
      - If it's a URL, downloads the assets ZIP file before using it
 3. **Command Building**: Dynamically builds the Java command line based on environment variables:
+   - **JVM Arguments**: Memory settings (`SERVER_MIN_RAM`/`SERVER_MAX_RAM`) and custom JVM args (`JAVA_JVM_ARGS`)
    - `--assets`: Includes custom assets ZIP if provided
    - `--accept-early-plugins`: Enables early plugin loading if configured
    - `--bind`: Sets server bind address and port
@@ -275,6 +310,17 @@ services:
             - SERVER_BIND=0.0.0.0:5520
             - SERVER_BACKUP_DIR=/hytale/backups
             - SERVER_BACKUP_INTERVAL=10
+        sysctls:
+            # Network optimizations (only network sysctls can be set per-container)
+            - net.core.somaxconn=4096
+            - net.ipv4.tcp_max_syn_backlog=4096
+            - net.core.netdev_max_backlog=4096
+            - net.ipv4.ip_local_port_range=10000 65535
+        ulimits:
+            # File descriptor/inode limits
+            nofile:
+                soft: 1048576
+                hard: 1048576
 ```
 
 #### Option 2: Building from Source
