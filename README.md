@@ -70,6 +70,92 @@ For detailed documentation, see:
 - 🇺🇸 [English (EN)](./docs/en/Getting%20Started.md)
 - 🇧🇷 [Português (PT-BR)](./docs/pt-BR/Iniciando.md)
 
+## Debugging with Java
+
+The Hytale Docker setup supports remote Java debugging using JDWP (Java Debug Wire Protocol). This allows you to attach a debugger from your IDE to the running server.
+
+### Enabling Debug Mode
+
+To enable Java debugging, set the `JAVA_DEBUG` environment variable to `true` in your `docker-compose.yml`:
+
+```yaml
+services:
+    hytale:
+        image: ghcr.io/machinastudios/hytale
+        ports:
+            - "5520:5520/udp"
+            - "5005:5005/tcp"  # JDWP debug port
+        environment:
+            - JAVA_DEBUG=true
+```
+
+The debug port `5005` is automatically exposed when debug mode is enabled. The server will start with JDWP agent configured to listen on `*:5005`.
+
+### Connecting from Your IDE
+
+#### Visual Studio Code
+
+1. Create or update `.vscode/launch.json`:
+
+```json
+{
+    "configurations": [
+        {
+            "name": "Attach to Hytale Server",
+            "type": "java",
+            "request": "attach",
+            "hostName": "localhost",
+            "port": 5005
+        }
+    ]
+}
+```
+
+2. Start the server with debug enabled
+3. Set breakpoints in your code
+4. Press `F5` or use the Debug panel to attach to the server
+
+#### IntelliJ IDEA / Android Studio
+
+1. Go to **Run** → **Edit Configurations...**
+2. Click **+** → **Remote JVM Debug**
+3. Configure:
+   - **Name**: `Hytale Server Debug`
+   - **Host**: `localhost`
+   - **Port**: `5005`
+   - **Debugger mode**: `Attach to remote JVM`
+4. Click **OK** and start debugging
+
+#### Eclipse
+
+1. Go to **Run** → **Debug Configurations...**
+2. Right-click **Remote Java Application** → **New**
+3. Configure:
+   - **Name**: `Hytale Server Debug`
+   - **Project**: Select your project
+   - **Host**: `localhost`
+   - **Port**: `5005`
+4. Click **Debug**
+
+### Debug Configuration Details
+
+When `JAVA_DEBUG=true`, the server starts with the following JVM argument:
+
+```
+-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+```
+
+- **`transport=dt_socket`**: Uses socket transport for debugging
+- **`server=y`**: Server mode (waits for debugger to attach)
+- **`suspend=n`**: Server starts immediately without waiting for debugger
+- **`address=*:5005`**: Listens on all interfaces on port 5005
+
+### Tips
+
+- **Suspend on Start**: To make the server wait for the debugger before starting, you can modify the entrypoint script or use `JAVA_JVM_ARGS` with `suspend=y`
+- **Remote Debugging**: If debugging from a different machine, ensure port `5005` is accessible and use the server's IP address instead of `localhost`
+- **Performance**: Debug mode may slightly impact server performance. Disable it in production environments
+
 ## Notes
 
 - The Hytale server requires Java 22 (provided by the OpenJDK base image)

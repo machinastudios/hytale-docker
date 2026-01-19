@@ -14,6 +14,9 @@ SERVER_ASSETS_ZIP="${SERVER_ASSETS_ZIP:-}"
 SERVER_BACKUP_DIR="${SERVER_BACKUP_DIR:-/hytale/backups}"
 SERVER_BACKUP_INTERVAL="${SERVER_BACKUP_INTERVAL:-10}"
 
+# If Java debug is enabled
+JAVA_DEBUG="${JAVA_DEBUG:-false}"
+
 # Set the app directory
 APP_DIR="${APP_DIR:-/hytale}"
 
@@ -502,6 +505,11 @@ fi
 
 if [ -n "$SERVER_MAX_RAM" ]; then
     COMMAND_LINE="$COMMAND_LINE -Xmx$SERVER_MAX_RAM"
+fi
+
+# If Java debug is enabled, add the debug flag to the command line
+if [ "$JAVA_DEBUG" = "true" ]; then
+    COMMAND_LINE="$COMMAND_LINE -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
 fi
 
 # Add custom JVM arguments if specified

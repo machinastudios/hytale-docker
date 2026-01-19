@@ -47,8 +47,9 @@ RUN rm hytale-downloader-windows-amd64.exe
 # Clean up
 RUN rm hytale-downloader.zip
 
-# Expose the port
+# Expose the ports
 EXPOSE 5520
+EXPOSE 5005
 
 # Copy the entrypoint script
 COPY entrypoint.sh /entrypoint.sh
