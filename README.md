@@ -50,6 +50,7 @@ services:
             - SERVER_BIND=0.0.0.0:5520
             - SERVER_BACKUP_DIR=/hytale/backups
             - SERVER_BACKUP_INTERVAL=10
+            - SERVER_MAX_VIEW_RADIUS=12
 ```
 
 Then start the server and attach to the console:
