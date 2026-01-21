@@ -1,4 +1,3 @@
-# Use the openjdk:22-jdk-slim image
 FROM eclipse-temurin:25.0.1_8-jre-alpine-3.23
 
 LABEL org.opencontainers.image.source=https://github.com/machinastudios/hytale-docker
