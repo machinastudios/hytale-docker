@@ -4,6 +4,7 @@ services:
         build: .
         stdin_open: true
         tty: true
+        user: 1000:1000
         ports:
             - "5520:5520/udp"
         volumes:
@@ -15,3 +16,16 @@ services:
             - SERVER_ACCEPT_EARLY_PLUGINS=true
             - SERVER_BIND=0.0.0.0:5520
             - SERVER_BACKUP=true
+        sysctls:
+            # Network optimizations (only network sysctls can be set per-container)
+            net.ipv4.ip_local_port_range: "1024 65535"
+            net.ipv4.tcp_tw_reuse: "1"
+            net.ipv4.tcp_fin_timeout: "15"
+            net.core.somaxconn: "65535"
+            net.ipv4.tcp_max_syn_backlog: "16384"
+            net.ipv4.tcp_slow_start_after_idle: "0"
+        ulimits:
+            # File descriptor/inode limits
+            nofile:
+                soft: 1048576
+                hard: 1048576
