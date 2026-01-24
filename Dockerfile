@@ -53,8 +53,23 @@ EXPOSE 5005
 # Copy the entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 
+# Copy the /src directory
+COPY src /src
+
 # Make the entrypoint script executable
 RUN chmod +x /entrypoint.sh
+
+# Create group 1000 if it doesn't exist
+RUN if ! getent group 1000; then groupadd -g 1000 hytale; fi
+
+# Create user 1000:1000 if it doesn't exist
+RUN if ! id -u 1000 2>/dev/null; then useradd -u 1000 -g 1000 -m -s /bin/bash hytale; fi
+
+# Fix permission of the app directory
+RUN chmod -R 755 /hytale && chown -R 1000:1000 /hytale
+
+# Set the user and group to 1000:1000 to run unprivileged
+USER 1000:1000
 
 # Run the server
 CMD ["/bin/bash", "/entrypoint.sh"]
