@@ -4,21 +4,17 @@
 # Display any errors when exiting
 set -e
 
-# For now, we will ignore the update check
-# because we don't know how to handle them
-DOWNLOADER_SKIP_UPDATE_CHECK="true"
+# Directories
+VERSION_FILE="${VERSION_FILE:-/hytale/VERSION}"
+APP_DIR="${APP_DIR:-/hytale}"
 
-# Defaults
+# Configuration defaults
 SERVER_AUTH_ENABLED="${SERVER_AUTH_ENABLED:-true}"
 SERVER_ASSETS_ZIP="${SERVER_ASSETS_ZIP:-}"
 SERVER_BACKUP_DIR="${SERVER_BACKUP_DIR:-/hytale/backups}"
 SERVER_BACKUP_INTERVAL="${SERVER_BACKUP_INTERVAL:-10}"
-
-# If Java debug is enabled
+DOWNLOADER_SKIP_UPDATE_CHECK="${SEVER_SKIP_UPDATE_CHECK:-false}"
 JAVA_DEBUG="${JAVA_DEBUG:-false}"
-
-# Set the app directory
-APP_DIR="${APP_DIR:-/hytale}"
 
 # Go to the app directory
 cd $APP_DIR
@@ -51,13 +47,9 @@ if [ -n "$DOWNLOADER_PATCHLINE" ]; then
 fi
 
 # Run the downloader to download/update server files
-# Check if HytaleServer.jar exists - if not, run downloader even if skip is set
-if [ ! -f "$APP_DIR/HytaleServer.jar" ] || [ -z "$DOWNLOADER_SKIP_UPDATE_CHECK" ]; then
-    if [ -z "$DOWNLOADER_SKIP_UPDATE_CHECK" ]; then
-        echo "checking for updates..."
-    else
-        echo "running the downloader for the first time..."
-    fi
+# Check if HytaleServer.jar exists - if not, run downloader 
+if [ ! -f "$APP_DIR/HytaleServer.jar" ]; then
+    echo "running the downloader for the first time..."
 
     # If a server-files.zip file is not found, exit
     if [ ! -f "$DOWNLOADER_TMP_FILE" ]; then
@@ -109,6 +101,71 @@ if [ ! -f "$APP_DIR/HytaleServer.jar" ] || [ -z "$DOWNLOADER_SKIP_UPDATE_CHECK" 
 
         # Delete the server files zip
         rm $DOWNLOADER_TMP_FILE
+    fi
+    INSTALLED_VERSION=$($DOWNLOADER_CMD -print-version)
+    echo "storing current version ($INSTALLED_VERSION) to $VERSION_FILE"
+    echo "$INSTALLED_VERSION" > "$VERSION_FILE"
+else
+    if [ "$DOWNLOADER_SKIP_UPDATE_CHECK" != "true" ]; then
+        echo "checking for server updates..."
+
+        NEWESTVERSION=$($DOWNLOADER_CMD -print-version | tail -n 1 | tr -d '\r')
+        CURRENT_VERSION=$(cat "$VERSION_FILE" 2>/dev/null || echo "unknown")
+
+        echo "newest version available: $NEWESTVERSION"
+        echo "current version installed: $CURRENT_VERSION"
+
+        if [ "$NEWESTVERSION" != "$CURRENT_VERSION" ]; then
+            echo "updating server from version $CURRENT_VERSION to $NEWESTVERSION"
+            $DOWNLOADER_CMD $DOWNLOADER_ARGS
+
+            # If the update failed, exit
+            if [ $? -ne 0 ]; then
+                echo "failed to update server files"
+                exit 1
+            fi
+
+             # If server files where downloaded
+            if [ -f "$DOWNLOADER_TMP_FILE" ]; then
+                echo "unzipping server files..."
+            fi
+            # Create a tmp folder
+            TMP_FOLDER=$(mktemp -d)
+
+            # Delete the tmp folder on exit
+            trap "rm -rf $TMP_FOLDER" EXIT
+
+            # Unzip the server files
+            # They're inside the "Server" folder in the zip file
+            # and need to go to the root directory
+            unzip -q $DOWNLOADER_TMP_FILE  -d $TMP_FOLDER
+
+            # Copy the `Server` folder to the app directory
+            cp -r $TMP_FOLDER/Server/* $APP_DIR
+
+            # If no assets zip is found specified, use the default one
+            if [ -z "$SERVER_ASSETS_ZIP" ]; then
+                # Set the assets zip to the default one
+                SERVER_ASSETS_ZIP=$TMP_FOLDER/Assets.zip
+
+                # Copy the `Assets.zip` file to the app directory
+                cp $TMP_FOLDER/Assets.zip $APP_DIR/Assets.zip
+            fi
+
+            if [ $? -ne 0 ]; then
+                echo "failed to unzip server files"
+                exit 1
+            fi
+
+            # Delete the server files zip
+            rm $DOWNLOADER_TMP_FILE
+            echo "storing current version ($NEWESTVERSION) to $VERSION_FILE"
+            echo $NEWESTVERSION > $VERSION_FILE
+        else
+            echo "server is up to date, no update needed"
+        fi
+    else
+        echo "skipping server update check..."
     fi
 fi
 
