@@ -4,19 +4,17 @@
 # Display any errors when exiting
 set -e
 
-DOWNLOADER_SKIP_UPDATE_CHECK="${SEVER_SKIP_UPDATE_CHECK:-false}"
+# Directories
 VERSION_FILE="${VERSION_FILE:-/hytale/VERSION}"
-# Defaults
+APP_DIR="${APP_DIR:-/hytale}"
+
+# Configuration defaults
 SERVER_AUTH_ENABLED="${SERVER_AUTH_ENABLED:-true}"
 SERVER_ASSETS_ZIP="${SERVER_ASSETS_ZIP:-}"
 SERVER_BACKUP_DIR="${SERVER_BACKUP_DIR:-/hytale/backups}"
 SERVER_BACKUP_INTERVAL="${SERVER_BACKUP_INTERVAL:-10}"
-
-# If Java debug is enabled
+DOWNLOADER_SKIP_UPDATE_CHECK="${SEVER_SKIP_UPDATE_CHECK:-false}"
 JAVA_DEBUG="${JAVA_DEBUG:-false}"
-
-# Set the app directory
-APP_DIR="${APP_DIR:-/hytale}"
 
 # Go to the app directory
 cd $APP_DIR
@@ -110,10 +108,13 @@ if [ ! -f "$APP_DIR/HytaleServer.jar" ]; then
 else
     if [ "$DOWNLOADER_SKIP_UPDATE_CHECK" != "true" ]; then
         echo "checking for server updates..."
+
         NEWESTVERSION=$($DOWNLOADER_CMD -print-version | tail -n 1 | tr -d '\r')
         CURRENT_VERSION=$(cat "$VERSION_FILE" 2>/dev/null || echo "unknown")
+
         echo "newest version available: $NEWESTVERSION"
         echo "current version installed: $CURRENT_VERSION"
+
         if [ "$NEWESTVERSION" != "$CURRENT_VERSION" ]; then
             echo "updating server from version $CURRENT_VERSION to $NEWESTVERSION"
             $DOWNLOADER_CMD $DOWNLOADER_ARGS
@@ -162,7 +163,6 @@ else
             echo $NEWESTVERSION > $VERSION_FILE
         else
             echo "server is up to date, no update needed"
-
         fi
     else
         echo "skipping server update check..."
