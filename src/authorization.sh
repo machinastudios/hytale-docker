@@ -275,7 +275,16 @@ function refresh_tokens() {
         }' > "$TOKEN_FILE"
     
     log_info "Tokens refreshed successfully"
+    log_info "Generating downloader credentials..."
+
     generate_downloader_credentials
+
+    if [ $? -ne 0 ]; then
+        log_error "Failed to generate downloader credentials"
+        return 1
+    fi
+
+    log_info "Downloader credentials generated successfully"
     return 0
 }
 
@@ -289,22 +298,28 @@ function refresh_tokens() {
 #     "branch": "release",
 # }
 function generate_downloader_credentials() {
-    if [ -f "$TOKEN_FILE" ]; then
-        ACCESS_TOKEN=$(jq -r '.access_token // empty' "$TOKEN_FILE")
-        REFRESH_TOKEN=$(jq -r '.refresh_token // empty' "$TOKEN_FILE")
-        EXPIRES_AT=$(date -u -d "$EXPIRES_AT" +%s 2>/dev/null || echo "0")
-        BRANCH="${DOWNLOADER_PATCHLINE:-release}"
-
-        echo "{\"access_token\":\"$ACCESS_TOKEN\",\"refresh_token\":\"$REFRESH_TOKEN\",\"expires_at\":$EXPIRES_AT,\"branch\":\"$BRANCH\"}" > "$DOWNLOADER_CREDENTIALS_PATH"
-
-        log_info "Downloader credentials generated successfully"
-        log_debug "Downloader credentials: $DOWNLOADER_CREDENTIALS_PATH"
-    else
+    # If the TOKEN_FILE is not found, return 1
+    if [ ! -f "$TOKEN_FILE" ]; then
         log_error "Failed to generate downloader credentials. TOKEN_FILE not found"
         return 1
     fi
 
+    # Get the access token, refresh token, and expires at from the TOKEN_FILE
+    ACCESS_TOKEN=$(jq -r '.access_token // empty' "$TOKEN_FILE")
+    REFRESH_TOKEN=$(jq -r '.refresh_token // empty' "$TOKEN_FILE")
+    EXPIRES_AT=$(date -u -d "$EXPIRES_AT" +%s 2>/dev/null || echo "0")
+    BRANCH="${DOWNLOADER_PATCHLINE:-release}"
+
+    # If any of the tokens are empty, return 1
+    if [ -z "$ACCESS_TOKEN" ] || [ -z "$REFRESH_TOKEN" ] || [ -z "$EXPIRES_AT" ]; then
+        log_error "Failed to generate downloader credentials. Tokens are empty"
+        return 1
+    fi
+
+    echo "{\"access_token\":\"$ACCESS_TOKEN\",\"refresh_token\":\"$REFRESH_TOKEN\",\"expires_at\":$EXPIRES_AT,\"branch\":\"$BRANCH\"}" > "$DOWNLOADER_CREDENTIALS_PATH"
+
     log_info "Downloader credentials generated successfully"
+    log_debug "Downloader credentials: $DOWNLOADER_CREDENTIALS_PATH"
 
     return 0
 }
@@ -373,7 +388,6 @@ function authorization_check() {
 
         # Try to refresh tokens
         if refresh_tokens; then
-            log_info "Tokens refreshed successfully"
             generate_downloader_credentials
         else
             log_info "Token refresh failed, attempting full authentication..."
@@ -389,6 +403,8 @@ function authorization_check() {
     fi
 
     log_info "No refresh is needed, using existing tokens"
+
+    generate_downloader_credentials
 
     return 0
 }
