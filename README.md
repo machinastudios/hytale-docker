@@ -156,6 +156,7 @@ When `JAVA_DEBUG=true`, the server starts with the following JVM argument:
 - **Suspend on Start**: To make the server wait for the debugger before starting, you can modify the entrypoint script or use `JAVA_JVM_ARGS` with `suspend=y`
 - **Remote Debugging**: If debugging from a different machine, ensure port `5005` is accessible and use the server's IP address instead of `localhost`
 - **Performance**: Debug mode may slightly impact server performance. Disable it in production environments
+- **Machine UUID**: When your docker-desktop / WSL installation does not have a machine-id yet. Run `uuidgen | sudo tee /etc/machine-id` in WSL  
 
 ## Notes
 
