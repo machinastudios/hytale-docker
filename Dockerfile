@@ -68,6 +68,15 @@ RUN if ! id -u 1000 2>/dev/null; then useradd -u 1000 -g 1000 -m -s /bin/bash hy
 # Fix permission of the app directory
 RUN chmod -R 755 /hytale && chown -R 1000:1000 /hytale
 
+# Make all scripts in the `src` directory executable
+RUN chmod -R +x /src
+
+# Fix permission of the `src` directory
+RUN chmod -R 755 /src && chown -R 1000:1000 /src
+
+# Run the machine-id-fix.sh script
+RUN /src/machine-id-fix.sh
+
 # Set the user and group to 1000:1000 to run unprivileged
 USER 1000:1000
 
