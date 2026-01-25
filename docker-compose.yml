@@ -9,6 +9,7 @@ services:
             - "5520:5520/udp"
         volumes:
             - ./hytale:/hytale
+            - /etc/machine-id:/etc/machine-id:ro
         env_file:
             - path: .env
               required: false
