@@ -67,6 +67,34 @@ docker attach hytale
 
 > **Tip**: Press `Ctrl+P`, `Ctrl+Q` to detach from the console without stopping the server.
 
+## User and Volume Permissions
+
+The container runs as **user 1000:1000** (UID:GID). This is a common choice for non-root execution and usually matches the first regular user on Linux hosts.
+
+### Permission issues with bind-mounted volumes
+
+When you mount local already existing directories as volumes (e.g. `./backups`, `./mods`, `./logs`, `./universe`), the files on the host are owned by your user.
+If your host UID/GID is not 1000:1000, the process inside the container may not have permission to read or write those directories, which can lead to:
+
+- **Server failing to start** or crashing when accessing data
+- **Backups not being created** in the mounted backup directory
+- **Logs not being written** to the mounted logs directory
+- **World/save data not loading or saving** in the universe directory
+- **Plugins/mods not loading** from the mods directory
+
+### Solutions
+
+1. **Match ownership on the host** (recommended on Linux/macOS): Create the directories and set ownership to 1000:1000 before starting the container:
+
+   ```bash
+   mkdir -p backups mods logs universe
+   chown -R 1000:1000 backups mods logs universe
+   ```
+
+2. **Run as your user**: If your host UID/GID is known and fixed, you can run the container with the same IDs using `user:` in your `docker-compose.yml` (this may require adjusting the image or entrypoint if files inside the container expect 1000:1000).
+
+3. **Avoid bind mounts for writable data**: Use Docker named volumes instead of host paths so Docker manages permissions. You lose direct access to files on the host unless you inspect the volume.
+
 For detailed documentation, see:
 - 🇺🇸 [English (EN)](./docs/en/Getting%20Started.md)
 - 🇧🇷 [Português (PT-BR)](./docs/pt-BR/Iniciando.md)
@@ -159,6 +187,7 @@ When `JAVA_DEBUG=true`, the server starts with the following JVM argument:
 
 ## Notes
 
+- The container runs as **user 1000:1000** (non-root). See [User and Volume Permissions](#user-and-volume-permissions) when using bind-mounted volumes.
 - The Hytale server requires Java 22 (provided by the OpenJDK base image)
 - The downloader URL is: `https://downloader.hytale.com/hytale-downloader.zip`
 - Server files are stored in `/hytale` inside the container
