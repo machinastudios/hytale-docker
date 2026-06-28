@@ -317,6 +317,23 @@ SERVER_BACKUP_INTERVAL="${SERVER_BACKUP_INTERVAL:-10}"
 # Add the backup flag to the command line
 COMMAND_LINE="$COMMAND_LINE --backup --backup-dir $SERVER_BACKUP_DIR --backup-frequency $SERVER_BACKUP_INTERVAL"
 
+# Optional: Hytale server 2026.04+ CLI flags (see com.hypixel.hytale.server.core.Options)
+if [ "${SERVER_IGNORE_BROKEN_MODS}" = "true" ]; then
+    COMMAND_LINE="$COMMAND_LINE --ignore-broken-mods"
+fi
+
+if [ "${SERVER_VERIFY_WORLDS}" = "true" ]; then
+    COMMAND_LINE="$COMMAND_LINE --verify-worlds"
+fi
+
+if [ -n "$SERVER_RECOVERY_MODE" ]; then
+    COMMAND_LINE="$COMMAND_LINE --recovery-mode $SERVER_RECOVERY_MODE"
+fi
+
+if [ -n "$SERVER_BACKUP_ARCHIVE_MAX_COUNT" ]; then
+    COMMAND_LINE="$COMMAND_LINE --backup-archive-max-count $SERVER_BACKUP_ARCHIVE_MAX_COUNT"
+fi
+
 # Check for session token (environment variable takes precedence)
 if [ -n "$HYTALE_SERVER_SESSION_TOKEN" ]; then
     SESSION_TOKEN="$HYTALE_SERVER_SESSION_TOKEN"

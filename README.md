@@ -8,7 +8,7 @@
 
 ## Overview
 
-This project containerizes the Hytale server using Docker, making it easy to deploy and manage the server with consistent configuration. It includes:
+This project containerizes the Hytale server using Docker, making it easy to deploy and manage the server with consistent configuration. The bundled `docker-compose.yml` sets **`DOWNLOADER_PATCHLINE=pre-release`** so the downloaded server matches the **Maven pre-release** channel used when building mods against `com.hypixel.hytale:Server`. It includes:
 
 - Automated Hytale server download and installation
 - Docker Compose configuration for easy orchestration
@@ -48,6 +48,7 @@ services:
         environment:
             - SERVER_ACCEPT_EARLY_PLUGINS=true
             - SERVER_BIND=0.0.0.0:5520
+            - DOWNLOADER_PATCHLINE=pre-release
             - SERVER_BACKUP_DIR=/hytale/backups
             - SERVER_BACKUP_INTERVAL=10
             - SERVER_MAX_VIEW_RADIUS=12

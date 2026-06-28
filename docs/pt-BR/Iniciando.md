@@ -221,14 +221,34 @@ O downloader do Hytale pode ser configurado usando variáveis de ambiente. Essas
 - **Uso**: Personalize onde os arquivos do servidor são baixados antes da extração
 
 #### `DOWNLOADER_PATCHLINE`
-- **Descrição**: Patchline para baixar (ex: "release", "beta", etc.)
-- **Padrão**: `release`
-- **Uso**: Selecione qual canal de patchline/versão baixar
+- **Descrição**: Canal patchline do downloader oficial Hytale (ex.: `pre-release`, `release`).
+- **Padrão**: `pre-release` (alinhado ao [Maven pre-release](https://maven.hytale.com/pre-release) usado no desenvolvimento de mods com `com.hypixel.hytale:Server`)
+- **Uso**: Altere apenas se precisar de outro canal (ex.: `release` para instalações só estáveis)
 
 #### `DOWNLOADER_SKIP_UPDATE_CHECK`
 - **Descrição**: Pular execução do downloader para verificar/atualizar arquivos do servidor
-- **Padrão**: O downloader executa por padrão para baixar/atualizar arquivos do servidor
-- **Uso**: Defina qualquer valor não vazio para pular a execução do downloader (útil se os arquivos já estiverem presentes)
+- **Padrão**: `false` — o downloader executa salvo quando definido como `true`
+- **Uso**: Defina `true` para pular verificações de atualização (útil se os arquivos já estiverem presentes). Também existe o alias legado `SEVER_SKIP_UPDATE_CHECK` (typo); `DOWNLOADER_SKIP_UPDATE_CHECK` tem prioridade quando ambos estão definidos.
+
+#### `SERVER_IGNORE_BROKEN_MODS`
+- **Descrição**: Adiciona `--ignore-broken-mods` ao servidor para tentar iniciar mesmo com mod com falha
+- **Padrão**: Não definido (flag omitida)
+- **Uso**: Defina `true` para ativar
+
+#### `SERVER_VERIFY_WORLDS`
+- **Descrição**: Adiciona `--verify-worlds` (verifica mundos e encerra; manutenção/diagnóstico)
+- **Padrão**: Não definido
+- **Uso**: Defina `true` para ativar
+
+#### `SERVER_RECOVERY_MODE`
+- **Descrição**: Adiciona `--recovery-mode <valor>` para comportamento de recuperação de chunks
+- **Padrão**: Não definido
+- **Valores**: `FROM_BACKUP_OR_REGENERATE` ou `REGENERATE` (enum `Options.RecoveryMode` do servidor)
+
+#### `SERVER_BACKUP_ARCHIVE_MAX_COUNT`
+- **Descrição**: Adiciona `--backup-archive-max-count <n>` para limitar arquivos de backup retidos
+- **Padrão**: Não definido (usa padrão do servidor)
+- **Uso**: Defina um inteiro positivo se necessário
 
 ### Montagem de Volumes
 
@@ -297,7 +317,7 @@ O script entrypoint que executa quando o container inicia:
 
 1. **Execução do Downloader**: Executa o downloader do Hytale com opções configuradas:
    - Suporta configuração do downloader via variáveis de ambiente
-   - Baixa/atualiza arquivos do servidor antes de iniciar o servidor (a menos que `DOWNLOADER_SKIP_UPDATE_CHECK` esteja definido)
+   - Baixa/atualiza arquivos do servidor antes de iniciar o servidor (a menos que `DOWNLOADER_SKIP_UPDATE_CHECK=true`)
    - Se as credenciais não forem fornecidas, o downloader exibirá uma URL de autorização e código nos logs na primeira execução
 2. **Manipulação de Assets**: 
    - **Se `SERVER_ASSETS_ZIP` não estiver definido**: O Hytale extrai e usa automaticamente assets padrão (nenhuma configuração necessária)
@@ -312,6 +332,7 @@ O script entrypoint que executa quando o container inicia:
    - `--backup`: Habilita funcionalidade de backup
    - `--backup-dir`: Define localização do diretório de backup
    - `--backup-frequency`: Define intervalo de backup em minutos
+   - Opcional (quando definido): `--ignore-broken-mods`, `--verify-worlds`, `--recovery-mode`, `--backup-archive-max-count` via variáveis `SERVER_*` (ver referência de ambiente acima)
 4. **Execução do Servidor**: Lança `HytaleServer.jar` com os parâmetros configurados
 
 ## Construindo a Imagem

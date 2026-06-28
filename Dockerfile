@@ -5,8 +5,8 @@ LABEL org.opencontainers.image.description="Hytale Server Docker Image"
 LABEL org.opencontainers.image.licenses=MIT
 LABEL org.opencontainers.image.authors="Machina Studios"
 LABEL org.opencontainers.image.vendor="Machina Studios"
-LABEL org.opencontainers.image.version="1.0.1"
-LABEL org.opencontainers.image.revision="1.0.1"
+LABEL org.opencontainers.image.version="1.0.2"
+LABEL org.opencontainers.image.revision="1.0.2"
 LABEL org.opencontainers.image.url="https://github.com/machinastudios/hytale-docker"
 LABEL org.opencontainers.image.documentation="https://github.com/machinastudios/hytale-docker"
 

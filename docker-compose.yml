@@ -16,6 +16,7 @@ services:
             - SERVER_ACCEPT_EARLY_PLUGINS=true
             - SERVER_BIND=0.0.0.0:5520
             - SERVER_BACKUP=true
+            - DOWNLOADER_PATCHLINE=pre-release
         sysctls:
             # Network optimizations (only network sysctls can be set per-container)
             net.ipv4.ip_local_port_range: "1024 65535"
